@@ -1,5 +1,5 @@
 """
-    NAME:            serial_comm_module (Serial Communication Module)
+    NAME:            Serial Communication Module (serial_comm/main.py)
     AUTHOR:          Nicolo' Maffi
     WRITTEN:         5 apr 2026
     COMPILED:        5 apr 2026

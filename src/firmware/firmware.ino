@@ -1,5 +1,5 @@
 /**
- * NAME:            hw_ctrl_module (Hardware Control Module)
+ * NAME:            Radar Firmware Module (firmware.ino)
  * AUTHOR:          Nicolo' Maffi
  * WRITTEN:         5 apr 2026
  * COMPILED:        5 apr 2026
