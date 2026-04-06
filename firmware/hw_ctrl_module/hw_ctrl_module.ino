@@ -22,9 +22,9 @@
 
 // Serial communication configs
 #define __SERIAL_DELAY_MS      20 // Standard 50 Hz refresh rate
-#define __SERIAL_DATA_SIZE      8 // Bytes
 #define __SERIAL_BAUD_RATE 115200
-#define __SERIAL_STOP_SIG    0xFF
+#define __SERIAL_STR_DEL   "@"
+#define __SERIAL_STOP_SIG  "STOP"
 
 // Conversion utility
 #define RAD_TO_DEG(RAD) ((RAD) * 180.f / PI)
@@ -48,15 +48,6 @@ struct {
     float rad;    // Current angle value (radians)
     Servo servo;  // Servo controller object
 } radar;
-
-// Serial transmission buffer
-union {
-    struct {
-        float distance; // Distance (cm)
-        float radians;  // Angle (radians)
-    };
-    uint8_t bytes[__SERIAL_DATA_SIZE]; // Raw data
-} radar_data;
 
 // Volatile toggle for radar operation state
 static volatile bool __is_active;
@@ -123,13 +114,15 @@ void loop(void) {
         step_radar();
 
         // Update data packet
-        radar_data.distance = radar_scan();
-        radar_data.radians = radar.rad;
+        float distance = radar_scan();
+        float radians = radar.rad;
+
+        // Stream data
+        Serial.print(distance);
+        Serial.print(__SERIAL_STR_DEL);
+        Serial.println(radians);
     } else {
         // Sending RADAR STOPPED signal
-        memset(radar_data.bytes, __SERIAL_STOP_SIG, __SERIAL_DATA_SIZE);
+        Serial.println(__SERIAL_STOP_SIG);
     }
-
-    // Stream binary data
-    Serial.write(radar_data.bytes, __SERIAL_DATA_SIZE);
 }
