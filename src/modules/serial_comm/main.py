@@ -9,6 +9,10 @@
 import serial
 import signal
 import time
+import socket
+
+__SERVER_ADDRESS     = "127.0.0.1"
+__SERVER_PORT        = 21180
 
 # Specific module parameters
 __SERIAL_PORT        = "/dev/ttyACM0"
@@ -16,21 +20,50 @@ __SERIAL_TIMEOUT     = 0.5            # Seconds
 __SERIAL_DELAY_RECV  = 1e-3           # Seconds
 
 # Firmware comm parameters
-__SERIAL_BAUD_RATE = 115200
-__SERIAL_STR_DEL   = "@"
-__SERIAL_STOP_SIG  = "STOP"
+__SERIAL_BAUD_RATE   = 115200
 
-# Close the serial port comm
-def close_port(serial_port):
-    if 'ser' in locals() and serial_port.is_open:
+# Global comm resources
+serial_port = None
+sock = None
+
+# Cleanup resources and exit
+def close_all(code):
+    global serial_port, sock
+
+    if serial_port is not None and serial_port.is_open:
         serial_port.close()
         print(f"PORT {__SERIAL_PORT} CLOSED!")
 
+    if sock is not None:
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
+            print("SOCKET CLOSED!")
+        except OSError:
+            # Socket already closed
+            pass
+
+    exit(code)
+
+def socket_init():
+    global sock
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(None)
+
+    try:
+        sock.connect((__SERVER_ADDRESS, __SERVER_PORT))
+    except ConnectionRefusedError:
+        print(f"ERROR: CANNOT CONNECT TO {__SERVER_ADDRESS}:{__SERVER_PORT}!")
+        close_all(-1)
+
 # Module entry-point
 def main():
-    global serial_port
+    global serial_port, sock
 
     print("SERIAL COMMUNICATION MODULE ONLINE!")
+
+    socket_init()
 
     try:
         serial_port = serial.Serial(
@@ -43,33 +76,21 @@ def main():
 
         while True:
             try:
-                # Checking buffer data
                 if serial_port.in_waiting > 0:
-                    line = serial_port.readline().decode('utf-8').strip()
-
-                    # Check RADAR STOPPED signal
-                    if line == __SERIAL_STOP_SIG:
-                        print("RADAR HAS STOPPED!")
-                    else:
-                        distance, radians = line.split(__SERIAL_STR_DEL)
-                        print(f"Distance {distance} cm at {radians} rad!")
+                    sock.sendall(serial_port.readline())
 
                 time.sleep(__SERIAL_DELAY_RECV)
-            except (UnicodeDecodeError, ValueError):
-                # Garbage data filter
-                print("WARNING: SYNC ERROR OR CORRUPTED DATA RECEIVED!")
+            except ValueError:
+                print("WARNING: CORRUPTED DATA RECEIVED!")
                 continue
     except serial.SerialException:
-        # Physical errors
         print(f"ERROR: CANNOT CONNECT TO {__SERIAL_PORT} PORT!")
-    finally:
-        close_port(serial_port)
+        close_all(-1)
 
-# Signal handler manager
+# Signal handler
 def signal_handler(sig, _):
     if sig in [signal.SIGHUP, signal.SIGINT]:
-        close_port(serial_port)
-        exit(-1)
+        close_all(0)
 
     print("WARNING: CANNOT INTERRUPT THE MODULE!")
 
