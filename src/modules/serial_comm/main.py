@@ -1,18 +1,19 @@
 """
     NAME:            Serial Communication Module (serial_comm/main.py)
     AUTHOR:          Nicolo' Maffi
-    WRITTEN:         5 apr 2026
-    COMPILED:        5 apr 2026
+    WRITTEN:          5 apr 2026
+    COMPILED:        11 apr 2026
     INSTALLATION:    Linux Computer
 """
 
 import serial
 import signal
 import time
-import socket
+import sys
+import os
 
-__SERVER_ADDRESS     = "127.0.0.1"
-__SERVER_PORT        = 21180
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from radar_interface.interface import RadarInterface
 
 # Specific module parameters
 __SERIAL_PORT        = "/dev/ttyACM0"
@@ -24,46 +25,26 @@ __SERIAL_BAUD_RATE   = 115200
 
 # Global comm resources
 serial_port = None
-sock = None
 
 # Cleanup resources and exit
 def close_all(code):
-    global serial_port, sock
+    global serial_port
 
     if serial_port is not None and serial_port.is_open:
         serial_port.close()
         print(f"PORT {__SERIAL_PORT} CLOSED!")
 
-    if sock is not None:
-        try:
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
-            print("SOCKET CLOSED!")
-        except OSError:
-            # Socket already closed
-            pass
-
     exit(code)
-
-def socket_init():
-    global sock
-
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(None)
-
-    try:
-        sock.connect((__SERVER_ADDRESS, __SERVER_PORT))
-    except ConnectionRefusedError:
-        print(f"ERROR: CANNOT CONNECT TO {__SERVER_ADDRESS}:{__SERVER_PORT}!")
-        close_all(-1)
 
 # Module entry-point
 def main():
-    global serial_port, sock
+    global serial_port
 
     print("SERIAL COMMUNICATION MODULE ONLINE!")
 
-    socket_init()
+    radar_ui = RadarInterface()
+
+    print("USER INTERFACE ONLINE!")
 
     try:
         serial_port = serial.Serial(
@@ -74,17 +55,28 @@ def main():
 
         print(f"PORT {__SERIAL_PORT} INITIALIZED! LISTENING...")
 
-        while True:
-            try:
-                if serial_port.in_waiting > 0:
-                    sock.sendall(serial_port.readline())
+        pos = 0
+        dist = -1
 
-                time.sleep(__SERIAL_DELAY_RECV)
-            except ValueError:
-                print("WARNING: CORRUPTED DATA RECEIVED!")
-                continue
+        while True:
+            while serial_port.in_waiting > 0:
+                line = serial_port.readline().decode("utf-8", errors="replace").strip()
+
+                if line:
+                    try:
+                        parts = line.split("@")
+                        dist = int(float(parts[0]))
+                        pos = float(parts[1])
+                        print(dist)
+                    except:
+                        continue
+
+            if radar_ui.execute(pos, dist):
+                close_all(0)
+
     except serial.SerialException:
         print(f"ERROR: CANNOT CONNECT TO {__SERIAL_PORT} PORT!")
+    finally:
         close_all(-1)
 
 # Signal handler
