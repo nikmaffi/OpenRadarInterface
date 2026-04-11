@@ -1,8 +1,8 @@
 /**
  * NAME:            Radar Firmware Module (firmware.ino)
  * AUTHOR:          Nicolo' Maffi
- * WRITTEN:         5 apr 2026
- * COMPILED:        5 apr 2026
+ * WRITTEN:          5 apr 2026
+ * COMPILED:        11 apr 2026
  * INSTALLATION:    ATmega328P
  */
 
@@ -21,7 +21,7 @@
 #define __PORT_JOY       A0 // Analog input
 
 // Servo config
-#define __SERVO_UNIT_STEP 0.02f // Radians
+#define __SERVO_UNIT_STEP 0.01f // Radians
 #define __SERVO_MAX_RAD   3.00f // Radians
 #define __SERVO_MIN_RAD   0.35f // Radians
 
@@ -98,16 +98,26 @@ void step_radar(void) {
 }
 
 // Measure distance via ultrasonic pulse (cm)
+// Returns -1 on timeout (no echo received)
 float radar_scan(void) {
+    // Ensure trigger is LOW before pulse
     digitalWrite(__PORT_TRIGGER, LOW);
+    delayMicroseconds(2);
 
     // Trigger pulse
     digitalWrite(__PORT_TRIGGER, HIGH);
     delayMicroseconds(10);
     digitalWrite(__PORT_TRIGGER, LOW);
 
+    // Timeout ~38ms (~650cm max round-trip)
+    unsigned long duration = pulseIn(__PORT_ECHO, HIGH, 38000UL);
+
+    if(duration == 0) {
+        return -1;
+    }
+
     // Convert to cm
-    return 0.034f * pulseIn(__PORT_ECHO, HIGH) / 2;
+    return 0.034f * duration / 2;
 }
 
 void setup(void) {
